@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      # 漏洞开关：设置为 true 启用XSS漏洞（测试模式），设置为 false 禁用漏洞（安全模式）
+      - VULNERABILITIES_ENABLED=true
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    environment:
+      # 前端环境变量
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: unless-stopped
