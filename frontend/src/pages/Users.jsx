@@ -8,6 +8,8 @@ function Users() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({ username: '', email: '', bio: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -19,6 +21,24 @@ function Users() {
       setUsers(response.data);
     } catch (err) {
       console.error('获取用户失败', err);
+    }
+  };
+
+  // SQL注入漏洞-12: 用户搜索
+  const handleSearchUsers = async (e) => {
+    e.preventDefault();
+    try {
+      let url = `${API_URL}/users/search?`;
+      if (searchQuery) url += `q=${encodeURIComponent(searchQuery)}&`;
+      if (roleFilter) url += `role=${encodeURIComponent(roleFilter)}`;
+      
+      const response = await axios.get(url);
+      if (response.data.data) {
+        setUsers(response.data.data);
+      }
+    } catch (err) {
+      console.error('搜索失败', err);
+      alert('搜索失败: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -55,6 +75,49 @@ function Users() {
     <div>
       <h2>用户管理中心</h2>
       <p>查看和管理系统用户信息</p>
+
+      {/* 搜索区域 */}
+      <div style={{ 
+        backgroundColor: '#f5f5f5', 
+        padding: '15px', 
+        borderRadius: '8px', 
+        marginBottom: '20px' 
+      }}>
+        <h3 style={{ marginTop: 0, fontSize: '16px' }}>搜索用户</h3>
+        <form onSubmit={handleSearchUsers}>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input
+              type="text"
+              placeholder="搜索用户名或邮箱..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+            >
+              <option value="">所有角色</option>
+              <option value="admin">管理员</option>
+              <option value="editor">编辑</option>
+              <option value="user">普通用户</option>
+            </select>
+            <button type="submit" style={{ padding: '8px 16px' }}>搜索</button>
+            <button 
+              type="button" 
+              onClick={() => {
+                setSearchQuery('');
+                setRoleFilter('');
+                fetchUsers();
+              }}
+              style={{ padding: '8px 16px' }}
+            >
+              重置
+            </button>
+          </div>
+        </form>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', marginTop: '2rem' }}>
         <div>

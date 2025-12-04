@@ -88,11 +88,13 @@ app.get('/api/news', (req, res) => {
   });
 });
 
-// 获取单篇新闻
+// 获取单篇新闻 (SQL注入漏洞-1: 整数型注入)
 app.get('/api/news/:id', (req, res) => {
-  const sql = "SELECT * FROM news WHERE id = ?";
-  const params = [req.params.id];
-  db.get(sql, params, (err, row) => {
+  const id = req.params.id;
+  // 漏洞：直接拼接ID参数，没有验证和参数化
+  const sql = `SELECT * FROM news WHERE id = ${id}`;
+  
+  db.get(sql, [], (err, row) => {
     if (err) {
       res.status(400).json({ "error": err.message });
       return;
@@ -290,11 +292,23 @@ app.get('/api/categories', (req, res) => {
   res.json(categories);
 });
 
-// 按分类获取新闻
+// 按分类获取新闻 (SQL注入漏洞-2: 字符串型注入)
 app.get('/api/news/category/:category', (req, res) => {
   const category = req.params.category;
-  // 实际应该从数据库查询，这里简化处理
-  res.json({ message: `获取${category}分类的新闻`, data: [] });
+  // 漏洞：字符串参数直接拼接到SQL中
+  const sql = `SELECT id, title, author, category, views, publish_date FROM news WHERE category = '${category}'`;
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({ 
+      message: "success", 
+      category: category,
+      data: rows 
+    });
+  });
 });
 
 // --- 新闻评论 API ---
@@ -680,6 +694,302 @@ app.get('/api/analytics', (req, res) => {
       data: []
     });
   }
+});
+
+// ============================================================================
+// 产品商城 API (包含SQL注入漏洞)
+// ============================================================================
+
+// 获取所有产品列表
+app.get('/api/products', (req, res) => {
+  const sql = "SELECT id, name, description, price, stock, category FROM products";
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "message": "success",
+      "data": rows
+    });
+  });
+});
+
+// 获取产品详情 (SQL注入漏洞-3: Error-based注入)
+app.get('/api/products/:id', (req, res) => {
+  const id = req.params.id;
+  // 漏洞：整数型注入，错误信息会暴露数据库结构
+  const sql = `SELECT * FROM products WHERE id = ${id}`;
+  
+  db.get(sql, [], (err, row) => {
+    if (err) {
+      // 漏洞：直接返回数据库错误信息
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    
+    if (row) {
+      res.json({
+        "message": "success",
+        "data": row
+      });
+    } else {
+      res.status(404).json({ "error": "产品不存在" });
+    }
+  });
+});
+
+// 搜索产品 (SQL注入漏洞-4: UNION注入)
+app.get('/api/products/search', (req, res) => {
+  const keyword = req.query.q || '';
+  const category = req.query.category || '';
+  
+  let sql = `SELECT id, name, description, price, stock, category FROM products WHERE 1=1`;
+  
+  // 漏洞：搜索关键词直接拼接
+  if (keyword) {
+    sql += ` AND name LIKE '%${keyword}%'`;
+  }
+  
+  if (category) {
+    sql += ` AND category = '${category}'`;
+  }
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "message": "success",
+      "data": rows
+    });
+  });
+});
+
+// 更新产品库存 (SQL注入漏洞-5: UPDATE注入)
+app.put('/api/products/:id/stock', (req, res) => {
+  const id = req.params.id;
+  const { quantity } = req.body;
+  
+  if (quantity === undefined) {
+    return res.status(400).json({ error: '库存数量不能为空' });
+  }
+  
+  // 漏洞：UPDATE语句直接拼接用户输入
+  const sql = `UPDATE products SET stock = ${quantity} WHERE id = ${id}`;
+  
+  db.run(sql, [], function(err) {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    
+    if (this.changes === 0) {
+      res.status(404).json({ "error": "产品不存在" });
+    } else {
+      res.json({
+        "message": "库存更新成功",
+        "product_id": id,
+        "new_stock": quantity
+      });
+    }
+  });
+});
+
+// ============================================================================
+// 用户认证 API (包含SQL注入漏洞)
+// ============================================================================
+
+// 用户登录 (SQL注入漏洞-6: Boolean盲注)
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: '用户名和密码不能为空' });
+  }
+  
+  // 漏洞：直接拼接用户输入
+  const sql = `SELECT * FROM users_db WHERE username = '${username}' AND password = '${password}'`;
+  
+  db.get(sql, [], (err, row) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    
+    if (row) {
+      res.json({
+        "message": "登录成功",
+        "user": {
+          id: row.id,
+          username: row.username,
+          email: row.email,
+          role: row.role
+        },
+        "token": "fake-jwt-token-" + row.id
+      });
+    } else {
+      res.status(401).json({ "error": "用户名或密码错误" });
+    }
+  });
+});
+
+// 用户注册 (SQL注入漏洞-7: INSERT注入)
+app.post('/api/auth/register', (req, res) => {
+  const { username, password, email } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ error: '用户名和密码不能为空' });
+  }
+  
+  const created_at = new Date().toISOString().split('T')[0];
+  
+  // 漏洞：INSERT语句直接拼接用户输入
+  const sql = `INSERT INTO users_db (username, password, email, role, created_at) VALUES ('${username}', '${password}', '${email || ''}', 'user', '${created_at}')`;
+  
+  db.run(sql, [], function(err) {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.status(201).json({
+      "message": "注册成功",
+      "user_id": this.lastID,
+      "username": username
+    });
+  });
+});
+
+// 检查用户名是否存在 (SQL注入漏洞-8: Time-based盲注)
+app.get('/api/auth/check-username/:username', (req, res) => {
+  const username = req.params.username;
+  // 漏洞：可以利用子查询进行盲注
+  const sql = `SELECT COUNT(*) as count FROM users_db WHERE username = '${username}'`;
+  
+  db.get(sql, [], (err, row) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "available": row.count === 0,
+      "message": row.count > 0 ? "用户名已被使用" : "用户名可用"
+    });
+  });
+});
+
+// ============================================================================
+// 订单管理 API (包含SQL注入漏洞)
+// ============================================================================
+
+// 获取用户订单列表 (SQL注入漏洞-9: JOIN查询注入)
+app.get('/api/orders/user/:userId', (req, res) => {
+  const userId = req.params.userId;
+  // 漏洞：JOIN查询中直接拼接用户输入
+  const sql = `SELECT o.id, o.quantity, o.total_price, o.status, o.order_date, 
+               p.name as product_name, p.price as unit_price
+               FROM orders o 
+               JOIN products p ON o.product_id = p.id 
+               WHERE o.user_id = ${userId}
+               ORDER BY o.order_date DESC`;
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "message": "success",
+      "data": rows
+    });
+  });
+});
+
+// 获取所有订单 (SQL注入漏洞-10: ORDER BY注入)
+app.get('/api/orders', (req, res) => {
+  const sortBy = req.query.sort || 'order_date';
+  const order = req.query.order || 'DESC';
+  const status = req.query.status || '';
+  
+  // 漏洞：ORDER BY子句直接使用用户输入
+  let sql = `SELECT o.id, o.user_id, o.product_id, o.quantity, o.total_price, o.status, o.order_date,
+             u.username, p.name as product_name
+             FROM orders o
+             LEFT JOIN users_db u ON o.user_id = u.id
+             LEFT JOIN products p ON o.product_id = p.id`;
+  
+  if (status) {
+    sql += ` WHERE o.status = '${status}'`;
+  }
+  
+  sql += ` ORDER BY ${sortBy} ${order}`;
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "message": "success",
+      "data": rows
+    });
+  });
+});
+
+// 删除订单 (SQL注入漏洞-11: DELETE注入)
+app.delete('/api/orders/:id', (req, res) => {
+  const id = req.params.id;
+  // 漏洞：DELETE语句直接拼接
+  const sql = `DELETE FROM orders WHERE id = ${id}`;
+  
+  db.run(sql, [], function(err) {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    
+    if (this.changes === 0) {
+      res.status(404).json({ "error": "订单不存在或已删除" });
+    } else {
+      res.json({
+        "message": "订单删除成功",
+        "deleted_count": this.changes
+      });
+    }
+  });
+});
+
+// ============================================================================
+// 用户管理 API (包含SQL注入漏洞)
+// ============================================================================
+
+// 搜索用户 (SQL注入漏洞-12: LIKE注入)
+app.get('/api/users/search', (req, res) => {
+  const query = req.query.q || '';
+  const role = req.query.role || '';
+  
+  let sql = `SELECT id, username, email, role, created_at FROM users_db WHERE 1=1`;
+  
+  // 漏洞：LIKE查询中直接拼接用户输入
+  if (query) {
+    sql += ` AND (username LIKE '%${query}%' OR email LIKE '%${query}%')`;
+  }
+  
+  if (role) {
+    sql += ` AND role = '${role}'`;
+  }
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "message": "success",
+      "data": rows
+    });
+  });
 });
 
 app.listen(PORT, () => {

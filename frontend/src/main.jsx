@@ -18,6 +18,13 @@ import RSS from './pages/RSS.jsx';
 import Editor from './pages/Editor.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Recommendations from './pages/Recommendations.jsx';
+import Products from './pages/Products.jsx';
+import Orders from './pages/Orders.jsx';
+import Login from './pages/Login.jsx';
+import ShopHub from './pages/ShopHub.jsx';
+import CommunityHub from './pages/CommunityHub.jsx';
+import UserCenter from './pages/UserCenter.jsx';
+import AdminHub from './pages/AdminHub.jsx';
 
 const router = createBrowserRouter([
   {
@@ -28,18 +35,35 @@ const router = createBrowserRouter([
       { path: '/news', element: <NewsList /> },
       { path: '/news/:id', element: <NewsDetail /> },
       { path: '/search', element: <SearchResults /> },
+      
+      // 商城中心
+      { path: '/shop', element: <ShopHub /> },
+      { path: '/products', element: <Products /> },
+      { path: '/orders', element: <Orders /> },
+      
+      // 社区互动
+      { path: '/community', element: <CommunityHub /> },
       { path: '/guestbook', element: <Guestbook /> },
-      { path: '/profile', element: <Profile /> },
-      { path: '/feedback', element: <Feedback /> },
-      { path: '/users', element: <Users /> },
-      { path: '/tags', element: <Tags /> },
-      { path: '/subscriptions', element: <Subscriptions /> },
-      { path: '/favorites', element: <Favorites /> },
-      { path: '/share', element: <Share /> },
       { path: '/rss', element: <RSS /> },
+      { path: '/share', element: <Share /> },
+      { path: '/feedback', element: <Feedback /> },
+      
+      // 个人中心
+      { path: '/user-center', element: <UserCenter /> },
+      { path: '/profile', element: <Profile /> },
+      { path: '/favorites', element: <Favorites /> },
+      { path: '/subscriptions', element: <Subscriptions /> },
+      { path: '/recommendations', element: <Recommendations /> },
+      
+      // 管理后台
+      { path: '/admin', element: <AdminHub /> },
       { path: '/editor', element: <Editor /> },
       { path: '/analytics', element: <Analytics /> },
-      { path: '/recommendations', element: <Recommendations /> },
+      { path: '/users', element: <Users /> },
+      { path: '/tags', element: <Tags /> },
+      
+      // 登录
+      { path: '/login', element: <Login /> },
     ],
   },
 ]);

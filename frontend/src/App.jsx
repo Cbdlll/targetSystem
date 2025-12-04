@@ -19,20 +19,19 @@ function App() {
         <div className="container">
           <NavLink to="/" className="logo-link"><h1 className="logo">新闻门户</h1></NavLink>
           <ul className="nav-links">
-            <li><NavLink to="/">首页</NavLink></li>
-            <li><NavLink to="/news">新闻</NavLink></li>
-            <li><NavLink to="/guestbook">留言板</NavLink></li>
-            <li><NavLink to="/users">用户</NavLink></li>
-            <li><NavLink to="/profile">个人中心</NavLink></li>
-            <li><NavLink to="/feedback">反馈</NavLink></li>
-            <li><NavLink to="/tags">标签</NavLink></li>
-            <li><NavLink to="/subscriptions">订阅</NavLink></li>
-            <li><NavLink to="/favorites">收藏</NavLink></li>
-            <li><NavLink to="/share">分享</NavLink></li>
-            <li><NavLink to="/rss">RSS</NavLink></li>
-            <li><NavLink to="/recommendations">推荐</NavLink></li>
-            <li><NavLink to="/editor">编辑后台</NavLink></li>
-            <li><NavLink to="/analytics">数据分析</NavLink></li>
+            <li><NavLink to="/">🏠 首页</NavLink></li>
+            <li><NavLink to="/news">📰 新闻</NavLink></li>
+            <li><NavLink to="/shop">🛍️ 商城</NavLink></li>
+            <li><NavLink to="/community">🌐 社区</NavLink></li>
+            <li><NavLink to="/user-center">👤 个人中心</NavLink></li>
+            <li><NavLink to="/admin">🔧 管理后台</NavLink></li>
+            <li><NavLink to="/login" style={{ 
+              backgroundColor: '#007bff', 
+              color: '#fff',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              marginLeft: '10px'
+            }}>登录</NavLink></li>
           </ul>
           <form className="search-form" onSubmit={handleSearch}>
             <input
