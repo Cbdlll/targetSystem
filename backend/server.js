@@ -75,7 +75,7 @@ let nextRecommendationId = 1;
 
 // 获取所有新闻列表
 app.get('/api/news', (req, res) => {
-  const sql = "SELECT id, title, author, publish_date FROM news ORDER BY publish_date DESC";
+  const sql = "SELECT id, title, author, publish_date, category FROM news ORDER BY publish_date DESC";
   db.all(sql, [], (err, rows) => {
     if (err) {
       res.status(400).json({ "error": err.message });
@@ -84,6 +84,26 @@ app.get('/api/news', (req, res) => {
     res.json({
       "message": "success",
       "data": rows
+    });
+  });
+});
+
+// 按分类获取新闻 (SQL注入漏洞-2: 字符串型注入)
+// 注意：必须在 /api/news/:id 之前定义，否则会被 :id 拦截
+app.get('/api/news/category/:category', (req, res) => {
+  const category = req.params.category;
+  // 漏洞：字符串参数直接拼接到SQL中
+  const sql = `SELECT id, title, author, category, views, publish_date FROM news WHERE category = '${category}'`;
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({ 
+      message: "success", 
+      category: category,
+      data: rows 
     });
   });
 });
@@ -254,6 +274,35 @@ app.get('/api/users', (req, res) => {
   res.json(users);
 });
 
+// 搜索用户 (SQL注入漏洞-12: LIKE注入)
+// 注意：必须在 /api/users/:id 之前定义，否则会被 :id 拦截
+app.get('/api/users/search', (req, res) => {
+  const query = req.query.q || '';
+  const role = req.query.role || '';
+  
+  let sql = `SELECT id, username, email, role, created_at FROM users_db WHERE 1=1`;
+  
+  // 漏洞：LIKE查询中直接拼接用户输入
+  if (query) {
+    sql += ` AND (username LIKE '%${query}%' OR email LIKE '%${query}%')`;
+  }
+  
+  if (role) {
+    sql += ` AND role = '${role}'`;
+  }
+  
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    res.json({
+      "message": "success",
+      "data": rows
+    });
+  });
+});
+
 // 获取单个用户信息 (V21: 存储型XSS - 用户bio字段)
 app.get('/api/users/:id', (req, res) => {
   const user = users.find(u => u.id === parseInt(req.params.id));
@@ -290,25 +339,6 @@ app.put('/api/users/:id', (req, res) => {
 // 获取所有分类
 app.get('/api/categories', (req, res) => {
   res.json(categories);
-});
-
-// 按分类获取新闻 (SQL注入漏洞-2: 字符串型注入)
-app.get('/api/news/category/:category', (req, res) => {
-  const category = req.params.category;
-  // 漏洞：字符串参数直接拼接到SQL中
-  const sql = `SELECT id, title, author, category, views, publish_date FROM news WHERE category = '${category}'`;
-  
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      res.status(400).json({ "error": err.message });
-      return;
-    }
-    res.json({ 
-      message: "success", 
-      category: category,
-      data: rows 
-    });
-  });
 });
 
 // --- 新闻评论 API ---
@@ -715,31 +745,8 @@ app.get('/api/products', (req, res) => {
   });
 });
 
-// 获取产品详情 (SQL注入漏洞-3: Error-based注入)
-app.get('/api/products/:id', (req, res) => {
-  const id = req.params.id;
-  // 漏洞：整数型注入，错误信息会暴露数据库结构
-  const sql = `SELECT * FROM products WHERE id = ${id}`;
-  
-  db.get(sql, [], (err, row) => {
-    if (err) {
-      // 漏洞：直接返回数据库错误信息
-      res.status(400).json({ "error": err.message });
-      return;
-    }
-    
-    if (row) {
-      res.json({
-        "message": "success",
-        "data": row
-      });
-    } else {
-      res.status(404).json({ "error": "产品不存在" });
-    }
-  });
-});
-
 // 搜索产品 (SQL注入漏洞-4: UNION注入)
+// 注意：必须在 /api/products/:id 之前定义，否则会被 :id 拦截
 app.get('/api/products/search', (req, res) => {
   const keyword = req.query.q || '';
   const category = req.query.category || '';
@@ -764,6 +771,30 @@ app.get('/api/products/search', (req, res) => {
       "message": "success",
       "data": rows
     });
+  });
+});
+
+// 获取产品详情 (SQL注入漏洞-3: Error-based注入)
+app.get('/api/products/:id', (req, res) => {
+  const id = req.params.id;
+  // 漏洞：整数型注入，错误信息会暴露数据库结构
+  const sql = `SELECT * FROM products WHERE id = ${id}`;
+  
+  db.get(sql, [], (err, row) => {
+    if (err) {
+      // 漏洞：直接返回数据库错误信息
+      res.status(400).json({ "error": err.message });
+      return;
+    }
+    
+    if (row) {
+      res.json({
+        "message": "success",
+        "data": row
+      });
+    } else {
+      res.status(404).json({ "error": "产品不存在" });
+    }
   });
 });
 
@@ -963,34 +994,6 @@ app.delete('/api/orders/:id', (req, res) => {
 // ============================================================================
 // 用户管理 API (包含SQL注入漏洞)
 // ============================================================================
-
-// 搜索用户 (SQL注入漏洞-12: LIKE注入)
-app.get('/api/users/search', (req, res) => {
-  const query = req.query.q || '';
-  const role = req.query.role || '';
-  
-  let sql = `SELECT id, username, email, role, created_at FROM users_db WHERE 1=1`;
-  
-  // 漏洞：LIKE查询中直接拼接用户输入
-  if (query) {
-    sql += ` AND (username LIKE '%${query}%' OR email LIKE '%${query}%')`;
-  }
-  
-  if (role) {
-    sql += ` AND role = '${role}'`;
-  }
-  
-  db.all(sql, [], (err, rows) => {
-    if (err) {
-      res.status(400).json({ "error": err.message });
-      return;
-    }
-    res.json({
-      "message": "success",
-      "data": rows
-    });
-  });
-});
 
 app.listen(PORT, () => {
   console.log(`新闻系统后端已启动，运行于 http://localhost:${PORT}`);

